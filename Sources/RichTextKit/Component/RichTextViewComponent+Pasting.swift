@@ -37,12 +37,14 @@ public extension RichTextViewComponent {
     func pasteImage(
         _ image: ImageRepresentable,
         at index: Int,
-        moveCursorToPastedContent: Bool = true
+        moveCursorToPastedContent: Bool = true,
+		insertNewLine: Bool = true
     ) {
         pasteImages(
             [image],
             at: index,
-            moveCursorToPastedContent: moveCursorToPastedContent
+            moveCursorToPastedContent: moveCursorToPastedContent,
+			insertNewLine: insertNewLine
         )
     }
 
@@ -65,19 +67,23 @@ public extension RichTextViewComponent {
     func pasteImages(
         _ images: [ImageRepresentable],
         at index: Int,
-        moveCursorToPastedContent move: Bool = false
+        moveCursorToPastedContent move: Bool = false,
+		insertNewLine: Bool = true
     ) {
         #if os(watchOS)
         assertionFailure("Image pasting is not supported on this platform")
         #else
         guard validateImageInsertion(for: imagePasteConfiguration) else { return }
-        let items = images.count * 2 // The number of inserted "items" is the images and a newline for each
-        let insertRange = NSRange(location: index, length: 0)
+		var items: Int = images.count
+		if insertNewLine {
+			items = images.count * 2 // The number of inserted "items" is the images and a newline for each
+		}
+	    let insertRange = NSRange(location: index, length: 0)
         let safeInsertRange = safeRange(for: insertRange)
         let isSelectedRange = (index == selectedRange.location)
         if isSelectedRange { deleteCharacters(in: selectedRange) }
         if move { moveInputCursor(to: index) }
-        images.reversed().forEach { performPasteImage($0, at: index) }
+		images.reversed().forEach { performPasteImage($0, at: index, insertNewLine: insertNewLine) }
         if move { moveInputCursor(to: safeInsertRange.location + items) }
         if move || isSelectedRange {
             DispatchQueue.main.async {
@@ -138,13 +144,20 @@ private extension RichTextViewComponent {
 
     func performPasteImage(
         _ image: ImageRepresentable,
-        at index: Int
+        at index: Int,
+		insertNewLine: Bool
     ) {
-        let newLine = NSAttributedString(string: "\n", attributes: richTextAttributes)
+		let newLine = NSAttributedString(string: "\n", attributes: richTextAttributes)
+		let space = NSAttributedString(string: " ", attributes: richTextAttributes)
         let content = NSMutableAttributedString(attributedString: richText)
         guard let insertString = getAttachmentString(for: image) else { return }
 
-        insertString.insert(newLine, at: insertString.length)
+		if insertNewLine {
+			insertString.insert(newLine, at: insertString.length)
+		}
+		else {
+			insertString.insert(space, at: insertString.length)
+		}
         insertString.addAttributes(richTextAttributes, range: insertString.richTextRange)
         content.insert(insertString, at: index)
 
